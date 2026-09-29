@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: #17221d;
+  background: #f7f8f4;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+.field {
+  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 cursor-pointer;
+}
+
+.btn-primary {
+  @apply btn bg-forest text-white hover:bg-forest/90 shadow-sm active:scale-[0.98];
+}
+
+.btn-secondary {
+  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-sm active:scale-[0.98];
+}
+
+.card {
+  @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+}
+
+.label {
+  @apply text-xs font-bold uppercase tracking-wider text-slate-500;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out forwards;
+}
