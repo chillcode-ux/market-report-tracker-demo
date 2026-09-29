@@ -1,24 +1,29 @@
 "use client";
 
-import React, { use } from "react";
+import React, { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, BarChart3, CheckCircle2, Circle, FileText } from "lucide-react";
 import { useDemoStore } from "@/lib/store";
 import { displayDate, getDaysOnMarket, getReportTimeline } from "@/lib/dates";
 import { StatusBadge } from "@/components/status-badge";
 import { CompleteButton } from "@/components/complete-button";
+import { ReportModal } from "@/components/report-modal";
+import { ReportDetailView } from "@/components/report-detail-view";
+import type { MarketReport } from "@/lib/types";
 
 export default function ListingDetailPage({
   params,
 }: {
   params: { id: string } | Promise<{ id: string }>;
 }) {
-  // Handle both resolved and promise params (Next.js 13/14/15 compatibility)
   const resolvedParams = "then" in params ? use(params) : params;
   const { id } = resolvedParams;
 
-  const { listings, completions } = useDemoStore();
+  const { listings, completions, marketReports } = useDemoStore();
   const listing = listings.find((l) => l.id === id);
+
+  const [recordingMilestone, setRecordingMilestone] = useState<number | null>(null);
+  const [viewingReport, setViewingReport] = useState<MarketReport | null>(null);
 
   if (!listing) {
     return (
@@ -36,6 +41,19 @@ export default function ListingDetailPage({
   }
 
   const timeline = getReportTimeline(listing, completions, 6);
+
+  const getReportForMilestone = (milestone: number) => {
+    return marketReports.find(
+      (m) => m.listing_id === listing.id && m.milestone_days === milestone
+    );
+  };
+
+  const getPreviousReport = (milestone: number) => {
+    const prior = marketReports
+      .filter((m) => m.listing_id === listing.id && m.milestone_days < milestone)
+      .sort((a, b) => b.milestone_days - a.milestone_days);
+    return prior[0] || null;
+  };
 
   return (
     <>
@@ -62,6 +80,11 @@ export default function ListingDetailPage({
               >
                 {listing.status}
               </span>
+              {listing.cycle_number && listing.cycle_number > 1 && (
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                  Relist Cycle #{listing.cycle_number}
+                </span>
+              )}
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900">{listing.address}</h1>
           </div>
@@ -100,9 +123,9 @@ export default function ListingDetailPage({
           </div>
 
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/80">
-            <span className="label">Listing Agent</span>
-            <div className="text-sm font-bold text-slate-900 mt-1">
-              {listing.agent || "Unassigned"}
+            <span className="label">List Price</span>
+            <div className="text-sm font-bold text-forest mt-1">
+              {listing.price ? `$${listing.price.toLocaleString()}` : "—"}
             </div>
           </div>
 
@@ -135,6 +158,8 @@ export default function ListingDetailPage({
       <div className="space-y-3">
         {timeline.map((r) => {
           const isDone = r.state === "completed";
+          const report = getReportForMilestone(r.milestone);
+
           return (
             <div
               className={`card flex flex-col gap-4 p-4 md:flex-row md:items-center shadow-sm transition ${
@@ -153,9 +178,29 @@ export default function ListingDetailPage({
                     {r.milestone}-Day Market Report
                   </b>
                   <StatusBadge state={r.state} />
+                  {report && (
+                    <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5">
+                      Report Recorded
+                    </span>
+                  )}
                 </div>
 
-                {r.completion ? (
+                {report ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-slate-700">
+                      Total Views: <b>{(Number(report.realtor_views || 0) + Number(report.rew_views || 0) + Number(report.facebook_views || 0) + Number(report.google_views || 0)).toLocaleString()}</b>
+                    </span>
+                    <span className="text-slate-400">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewingReport(report)}
+                      className="text-forest font-bold hover:underline inline-flex items-center gap-1"
+                    >
+                      <FileText size={12} />
+                      View Analytics & Summary
+                    </button>
+                  </div>
+                ) : r.completion ? (
                   <div className="text-xs text-slate-600 bg-emerald-50/80 border border-emerald-200/60 rounded px-2.5 py-1.5 mt-2 inline-block">
                     <span className="font-semibold text-emerald-800">
                       ✓ Completed on {displayDate(r.completion.completed_at.slice(0, 10), "MMMM d, yyyy")}
@@ -166,7 +211,7 @@ export default function ListingDetailPage({
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500 mt-1">
-                    Scheduled automatic milestone based on {r.milestone} days from listed date.
+                    Scheduled milestone based on {r.milestone} days from listed date.
                   </p>
                 )}
               </div>
@@ -192,8 +237,17 @@ export default function ListingDetailPage({
                 </div>
               </div>
 
-              {!isDone && (
-                <div className="md:min-w-[160px]">
+              <div className="flex items-center gap-2 md:min-w-[200px]">
+                <button
+                  type="button"
+                  onClick={() => setRecordingMilestone(r.milestone)}
+                  className="btn-secondary text-xs py-2 px-3 flex-1 flex items-center justify-center gap-1.5 font-bold text-forest hover:bg-forest/10"
+                >
+                  <BarChart3 size={13} />
+                  <span>{report ? "Edit Report" : "Create Report"}</span>
+                </button>
+
+                {!isDone && (
                   <CompleteButton
                     listingId={listing.id}
                     address={listing.address}
@@ -201,12 +255,33 @@ export default function ListingDetailPage({
                     reviewDate={r.reviewDate}
                     reportDate={r.reportDate}
                   />
-                </div>
-              )}
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* Create / Record Report Modal */}
+      {recordingMilestone !== null && (
+        <ReportModal
+          listing={listing}
+          initialMilestone={recordingMilestone}
+          existingReport={getReportForMilestone(recordingMilestone)}
+          previousReport={getPreviousReport(recordingMilestone)}
+          onClose={() => setRecordingMilestone(null)}
+        />
+      )}
+
+      {/* Detailed Report Viewer Modal */}
+      {viewingReport && (
+        <ReportDetailView
+          report={viewingReport}
+          listing={listing}
+          previousReport={getPreviousReport(viewingReport.milestone_days)}
+          onClose={() => setViewingReport(null)}
+        />
+      )}
     </>
   );
 }
